@@ -28,6 +28,17 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "should get new WITH one image starter among the conversation starters" do
+    get new_assistant_message_url(@assistant)
+    assert_response :success
+
+    image_starter_titles = I18n.t("app.conversations.image_starters").map { |s| s[:title] }
+    starter_titles = assigns(:conversation_starters).map(&:first)
+
+    assert_equal 4, starter_titles.size
+    assert_equal 1, (starter_titles & image_starter_titles).size
+  end
+
   test "should show message" do
     get message_url(@message)
     assert_response :success

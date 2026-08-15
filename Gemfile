@@ -4,7 +4,7 @@ source "https://rubygems.org"
 
 ruby file: ".ruby-version"
 
-gem "rails", "~> 7.2.2"
+gem "rails", "~> 8.0.2.1"
 gem "sprockets-rails" # The original asset pipeline for Rails [https://github.com/rails/sprockets-rails]
 gem "pg", "~> 1.1"
 gem "puma", ">= 6.0"
@@ -49,6 +49,7 @@ gem "actioncable-enhanced-postgresql-adapter" # longer paylaods w/ postgresql ac
 gem "aws-sdk-s3", require: false
 gem "postmark-rails"
 gem "ostruct"
+gem "pdf-reader", "~> 2.11"
 
 gem "omniauth", "~> 2.1"
 gem "omniauth-google-oauth2", "~> 1.1"
@@ -59,6 +60,7 @@ group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[mri mswin mswin64 mingw x64_mingw]
   gem "timecop"
+  gem "minitest-skip"
 end
 
 group :development do
@@ -73,11 +75,12 @@ group :development do
 
   gem "byebug", platforms: %i[mri mingw x64_mingw]
   gem "standard"
-  gem "ruby-lsp"
   gem "rubocop-rails"
   gem "rubocop-capybara"
   gem "rubocop-minitest"
   gem "dockerfile-rails", ">= 1.6"
+  gem "logcraft"
+  # gem "oj" # Optional, but recommended; see the "JSON serialization" section in the README
 end
 
 group :test do

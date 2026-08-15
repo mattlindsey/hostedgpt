@@ -1,6 +1,7 @@
 class ConversationsController < ApplicationController
-  before_action :set_conversation
-  before_action :set_nav_assistants
+  before_action :set_conversation, except: [:public_show]
+  before_action :set_nav_assistants, except: [:public_show]
+  allow_unauthenticated_access only: [:public_show]
 
   def index
     @query = params[:query]
@@ -17,17 +18,24 @@ class ConversationsController < ApplicationController
     if @conversation.update(conversation_params)
       redirect_to @conversation, status: :see_other
     else
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
     end
   end
 
   def destroy
     @conversation.destroy!
     if request.referer && request.referer.starts_with?(conversation_messages_url(@conversation))
-      redirect_to root_path, notice: "Deleted conversation", status: :see_other
+      redirect_to root_path, notice: I18n.t("app.flashes.conversations.deleted"), status: :see_other
     else
-      redirect_back fallback_location: root_path, notice: "Deleted conversation", status: :see_other
+      redirect_back fallback_location: root_path, notice: I18n.t("app.flashes.conversations.deleted"), status: :see_other
     end
+  end
+
+  def public_show
+    @conversation = Conversation.find_by!(share_token: params[:share_token])
+    @messages = @conversation.messages.includes(:assistant).ordered
+    @assistant = @conversation.assistant
+    render "public_show", layout: "public"
   end
 
   private

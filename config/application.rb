@@ -21,6 +21,10 @@ module HostedGPT
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 7.2
 
+  # I18n configuration
+    config.i18n.available_locales = [:en, :de]
+    config.i18n.default_locale = :en
+
     # To remove in 2025. This allows migration db/migrate/20240415134849_encrypt_keys.rb to encrypt existing plaintext keys
     config.active_record.encryption.support_unencrypted_data = true
 
@@ -36,6 +40,8 @@ module HostedGPT
     #
     config.time_zone = "Central Time (US & Canada)"
     config.eager_load_paths << Rails.root.join("lib")
+
+    config.active_support.to_time_preserves_timezone = :zone
 
     url_settings = [:app_url_protocol, :app_url_host]
     if url_settings.any?{|k| Setting.key_set?(k)}
@@ -67,5 +73,6 @@ module HostedGPT
     config.to_prepare do # FIXME: Remove this hack after Rails PR merges in: https://github.com/rails/rails/pull/52421
       ActionCable::Channel::Base.include ActionCableBasePatch
     end
+
   end
 end

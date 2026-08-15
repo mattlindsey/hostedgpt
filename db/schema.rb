@@ -10,9 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2024_12_12_091318) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_20_230241) do
   # These are extensions that must be enabled in order to support this database
-  enable_extension "plpgsql"
+  enable_extension "pg_catalog.plpgsql"
 
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
@@ -118,13 +118,13 @@ ActiveRecord::Schema[7.2].define(version: 2024_12_12_091318) do
     t.datetime "updated_at", null: false
     t.bigint "last_assistant_message_id"
     t.text "external_id", comment: "The Backend AI system (e.g OpenAI) Thread Id"
-    t.decimal "input_token_total_cost", precision: 30, scale: 15, default: "0.0", null: false
-    t.decimal "output_token_total_cost", precision: 30, scale: 15, default: "0.0", null: false
     t.integer "input_token_total_count", default: 0, null: false
     t.integer "output_token_total_count", default: 0, null: false
+    t.string "share_token"
     t.index ["assistant_id"], name: "index_conversations_on_assistant_id"
     t.index ["external_id"], name: "index_conversations_on_external_id", unique: true
     t.index ["last_assistant_message_id"], name: "index_conversations_on_last_assistant_message_id"
+    t.index ["share_token"], name: "index_conversations_on_share_token"
     t.index ["updated_at"], name: "index_conversations_on_updated_at"
     t.index ["user_id"], name: "index_conversations_on_user_id"
   end
@@ -172,10 +172,8 @@ ActiveRecord::Schema[7.2].define(version: 2024_12_12_091318) do
     t.bigint "user_id", null: false
     t.bigint "api_service_id"
     t.boolean "supports_tools", default: false
-    t.decimal "input_token_cost_cents", precision: 30, scale: 15
-    t.decimal "output_token_cost_cents", precision: 30, scale: 15
-    t.boolean "best", default: false
     t.boolean "supports_system_message", default: false
+    t.boolean "supports_pdf", default: false, null: false
     t.index ["api_service_id"], name: "index_language_models_on_api_service_id"
     t.index ["user_id", "deleted_at"], name: "index_language_models_on_user_id_and_deleted_at"
     t.index ["user_id"], name: "index_language_models_on_user_id"

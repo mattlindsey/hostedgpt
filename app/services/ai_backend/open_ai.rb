@@ -43,7 +43,7 @@ class AIBackend::OpenAI < AIBackend
       raise ::OpenAI::ConfigurationError if assistant.api_service.requires_token? && assistant.api_service.effective_token.blank?
       Rails.logger.info "Connecting to OpenAI API server at #{assistant.api_service.url} with access token of length #{assistant.api_service.effective_token.to_s.length}"
       @client = self.class.client.new(uri_base: assistant.api_service.url, access_token: assistant.api_service.effective_token, api_version: "")
-    rescue ::Faraday::UnauthorizedError => e
+    rescue ::Faraday::UnauthorizedError
       raise ::OpenAI::ConfigurationError
     end
   end
@@ -117,23 +117,51 @@ class AIBackend::OpenAI < AIBackend
 
   def preceding_conversation_messages
     @conversation.messages.for_conversation_version(@message.version).where("messages.index < ?", @message.index).collect do |message|
-      if @assistant.supports_images? && message.documents.present?
+      if @assistant.supports_images? && message.documents.present? && message.role == "user"
+        # Handle mixed content (images and PDFs)
+        content_with_media = [{ type: "text", text: message.content_text }]
 
-        content_with_images = [{ type: "text", text: message.content_text }]
-        content_with_images += message.documents.collect do |document|
-          { type: "image_url", image_url: { url: document.image_url(:large) }}
+        message.documents.each do |document|
+          if document.has_image?
+            content_with_media << { type: "image_url", image_url: { url: document.image_url(:large) }}
+          elsif document.has_document_pdf?
+            # Extract text from PDF and include it in the conversation
+            pdf_text = document.extract_pdf_text
+            if pdf_text.present?
+              content_with_media << {
+                type: "text",
+                text: "\n\n[PDF Document: #{document.filename}]\n#{pdf_text}"
+              }
+            else
+              content_with_media << {
+                type: "text",
+                text: "\n[PDF Document: #{document.filename} - Unable to extract text from this PDF]"
+              }
+            end
+          end
         end
 
         {
           role: message.role,
           name: message.name_for_api,
-          content: content_with_images,
+          content: content_with_media,
         }.compact
       else
+        begin
+          parsed = JSON.parse(message.content_text)
+          sanitized_content = if parsed.is_a?(Hash)
+            parsed.except("message_to_user", "json_of_generated_image").to_json
+          else
+            message.content_text
+          end
+        rescue
+          sanitized_content = message.content_text
+        end
+
         {
           role: message.role,
           name: message.name_for_api,
-          content: (JSON.parse(message.content_text).except("message_to_user").to_json rescue message.content_text),
+          content: sanitized_content,
           tool_calls: message.assistant? ? message.content_tool_calls : nil, # only for some assistant messages
           tool_call_id: message.tool_call_id,     # only for tool messages
         }.compact.except( message.content_tool_calls.blank? && :tool_calls )

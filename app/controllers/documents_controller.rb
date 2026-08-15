@@ -20,23 +20,23 @@ class DocumentsController < ApplicationController
     @document = Document.new(document_params)
 
     if @document.save
-      redirect_to @document, notice: "Document was successfully created.", status: :see_other
+      redirect_to @document, notice: I18n.t("app.flashes.documents.created"), status: :see_other
     else
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
   end
 
   def update
     if @document.update(document_params)
-      redirect_to @document, notice: "Document was successfully updated.", status: :see_other
+      redirect_to @document, notice: I18n.t("app.flashes.documents.updated"), status: :see_other
     else
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
     end
   end
 
   def destroy
     @document.destroy!
-    redirect_to documents_url, notice: "Document was successfully destroyed.", status: :see_other
+    redirect_to documents_url, notice: I18n.t("app.flashes.documents.destroyed"), status: :see_other
   end
 
   private

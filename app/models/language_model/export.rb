@@ -4,13 +4,10 @@ module LanguageModel::Export
   DEFAULT_EXPORT_ONLY = %i[
     api_name
     name
-    best
     api_service_name
     supports_images
     supports_tools
     supports_system_message
-    input_token_cost_cents
-    output_token_cost_cents
   ]
 
   DEFAULT_MODEL_FILE = "models.yml"

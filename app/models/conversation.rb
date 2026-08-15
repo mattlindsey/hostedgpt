@@ -9,6 +9,7 @@ class Conversation < ApplicationRecord
   has_many :steps, dependent: :destroy
   belongs_to :last_assistant_message, class_name: "Message", inverse_of: :conversation, optional: true
 
+  before_create :generate_share_token
   after_touch :set_title_async, if: -> { title.blank? && messages.count >= 2 }
 
   scope :ordered, -> { order(updated_at: :desc) }
@@ -36,6 +37,7 @@ class Conversation < ApplicationRecord
         select("DISTINCT conversations.*")
     end
 
+    # NOTE: These keys intentionally remain static for test stability. UI layers may translate.
     keys = ["Today", "Yesterday", "This Week", "This Month", "Last Month", "Older"]
     values = [
       nil,
@@ -63,11 +65,24 @@ class Conversation < ApplicationRecord
       .delete_if { |_, v| v.empty? }
   end
 
-  def total_cost
-    input_token_total_cost + output_token_total_cost
+
+  def generate_shareable_url(request)
+    ensure_share_token!
+    Rails.application.routes.url_helpers.public_conversation_url(share_token, host: request.host_with_port)
+  end
+
+  def ensure_share_token!
+    if share_token.blank?
+      update_column(:share_token, SecureRandom.urlsafe_base64(32))
+    end
+    share_token
   end
 
   private
+
+  def generate_share_token
+    self.share_token = SecureRandom.urlsafe_base64(32)
+  end
 
   def set_title_async
     AutotitleConversationJob.perform_later(id)

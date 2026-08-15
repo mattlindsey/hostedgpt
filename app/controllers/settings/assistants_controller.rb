@@ -1,6 +1,7 @@
 class Settings::AssistantsController < Settings::ApplicationController
   before_action :set_assistant, only: [:edit, :update, :destroy]
   before_action :set_last_assistant, except: [:destroy]
+  before_action :set_language_models, except: [:destroy]
 
   def new
     @assistant = Assistant.new
@@ -13,25 +14,25 @@ class Settings::AssistantsController < Settings::ApplicationController
     @assistant = Current.user.assistants.new(assistant_params)
 
     if @assistant.save
-      redirect_to edit_settings_assistant_path(@assistant), notice: "Saved", status: :see_other
+      redirect_to edit_settings_assistant_path(@assistant), notice: I18n.t("app.flashes.assistants.saved"), status: :see_other
     else
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
   end
 
   def update
     if @assistant.update(assistant_params)
-      redirect_to edit_settings_assistant_path(@assistant), notice: "Saved", status: :see_other
+      redirect_to edit_settings_assistant_path(@assistant), notice: I18n.t("app.flashes.assistants.saved"), status: :see_other
     else
-      render :edit, status: :unprocessable_entity
+      render :edit, status: :unprocessable_content
     end
   end
 
   def destroy
     if Current.user.assistants.count > 1 && @assistant.deleted!
-      redirect_to new_settings_assistant_url, notice: "Deleted", status: :see_other
+      redirect_to new_settings_assistant_url, notice: I18n.t("app.flashes.assistants.deleted"), status: :see_other
     else
-      redirect_to new_settings_assistant_url, alert: "Cannot delete your last assistant", status: :see_other
+      redirect_to new_settings_assistant_url, alert: I18n.t("app.flashes.assistants.last_delete_error"), status: :see_other
     end
   end
 
@@ -40,12 +41,19 @@ class Settings::AssistantsController < Settings::ApplicationController
   def set_assistant
     @assistant = Current.user.assistants.find_by(id: params[:id])
     if @assistant.nil?
-      redirect_to new_settings_assistant_url, notice: "The assistant was deleted", status: :see_other
+      redirect_to new_settings_assistant_url, notice: I18n.t("app.flashes.assistants.deleted_full"), status: :see_other
     end
   end
 
   def set_last_assistant
     @last_assistant = Current.user.assistants.count <= 1
+  end
+
+  def set_language_models
+    @models = LanguageModel.for_user(Current.user).ordered.pluck(:name, :id, :api_service_id)
+    @models.each_with_index do |model, index|
+      @models[index] = [model[0] + " (" + APIService.find(model[2]).name + ")", model[1]]
+    end
   end
 
   def assistant_params

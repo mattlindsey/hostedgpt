@@ -47,8 +47,6 @@ debugging:
   last_assistant_message: filter_map_example
   input_token_total_count: 12
   output_token_total_count: 36
-  input_token_total_cost: 0.12
-  output_token_total_cost: 0.72
 
 #  0.1
 #  1.1
@@ -85,6 +83,12 @@ weather:
   assistant: samantha
   title: Weather
   last_assistant_message: weather_explained
+
+image_generation:
+  user: keith
+  assistant: samantha
+  title: Generating an image
+  last_assistant_message: image_generation_explained
 
 memorize:
   user: keith

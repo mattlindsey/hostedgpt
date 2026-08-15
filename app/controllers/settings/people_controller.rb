@@ -6,10 +6,10 @@ class Settings::PeopleController < Settings::ApplicationController
 
   def update
     Current.person.update!(person_params)
-    redirect_to edit_settings_person_path, notice: "Saved", status: :see_other
+    redirect_to edit_settings_person_path, notice: I18n.t("app.flashes.assistants.saved"), status: :see_other
   rescue
     @person = Current.person
-    render :edit, status: :unprocessable_entity
+    render :edit, status: :unprocessable_content
   end
 
   private

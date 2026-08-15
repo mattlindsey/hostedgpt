@@ -1,5 +1,6 @@
 include ActionView::RecordIdentifier
 require "nokogiri/xml/node"
+
 class ::Gemini::Errors::ConfigurationError < ::Gemini::Errors::GeminiError; end
 
 class GetNextAIMessageJob < ApplicationJob
@@ -204,17 +205,33 @@ class GetNextAIMessageJob < ApplicationJob
     end
 
     index = @message.index
+    json_of_generated_image = nil
     msgs.each do |tool_message| # one message for each tool executed
+      parsed = JSON.parse(tool_message[:content]) rescue nil
+
+      if parsed.is_a?(Hash) && parsed.has_key?("json_of_generated_image")
+        json_of_generated_image = parsed["json_of_generated_image"]
+        # Redact the large base64 payload from the saved tool message content
+        parsed = parsed.except("json_of_generated_image")
+      end
+
+      content_to_save = if parsed.is_a?(Hash)
+        parsed.to_json
+      else
+        tool_message[:content]
+      end
+
       @conversation.messages.create!(
         assistant: @assistant,
         role: tool_message[:role],
-        content_text: tool_message[:content],
+        content_text: content_to_save,
         tool_call_id: tool_message[:tool_call_id],
         content_tool_calls: tool_message[:content_tool_calls],
         version: @message.version,
         index: index += 1,
         processed_at: Time.current,
       )
+
     end
 
     assistant_reply = @conversation.messages.create!(
@@ -224,6 +241,26 @@ class GetNextAIMessageJob < ApplicationJob
       version: @message.version,
       index: index += 1
     )
+
+    unless json_of_generated_image.nil?
+      binary_image_contents = Base64.decode64(json_of_generated_image)
+
+      tempfile = Tempfile.new(["generated", ".png"])
+      tempfile.binmode
+      tempfile.write(binary_image_contents)
+      tempfile.rewind
+
+      document = Document.new(message: assistant_reply,assistant: @assistant, user: @user, purpose: :assistants_output)
+      document.file.attach(
+        io: tempfile,
+        filename: "generated.png",
+        content_type: "image/png"
+      )
+      assistant_reply.documents << document
+
+      tempfile.close
+      tempfile.unlink
+    end
 
     GetNextAIMessageJob.perform_later(
       @user.id,

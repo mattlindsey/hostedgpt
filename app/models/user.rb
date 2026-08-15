@@ -50,6 +50,7 @@ class User < ApplicationRecord
 
   def profile_picture_url(variant = :small)
     return nil unless has_profile_picture?
+    return nil unless profile_picture.variable? # e.g. a rejected non-image upload still attached in memory
 
     if Rails.application.config.x.app_url.blank?
       # For development/test environments without configured app URL

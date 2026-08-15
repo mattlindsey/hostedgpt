@@ -130,7 +130,7 @@ class Settings::PeopleControllerTest < ActionDispatch::IntegrationTest
     params["personable_attributes"]["profile_picture"] = fixture_file_upload("test_document.txt", "text/plain")
 
     patch settings_person_url, params: { person: params }
-    assert_response :unprocessable_entity
+    assert_response :unprocessable_content
 
     refute @user.reload.has_profile_picture?
   end

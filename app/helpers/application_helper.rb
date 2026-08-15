@@ -97,7 +97,7 @@ module ApplicationHelper
 
   # Profile picture helper methods
   def user_avatar_image_tag(user, variant: :small, **options)
-    return nil unless user&.has_profile_picture?
+    return nil unless user&.has_profile_picture? && user.profile_picture.variable?
 
     default_options = {
       alt: "#{user.name.full}'s profile picture",

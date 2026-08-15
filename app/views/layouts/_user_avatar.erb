@@ -1,7 +1,7 @@
 <%# locals: (user:, size:, classes: nil) -%>
 <% text_size = size > 6 ? "text-sm" : "text-xs" %>
 
-<% if user.has_profile_picture? %>
+<% if user.has_profile_picture? && user.profile_picture.variable? %>
   <picture
     class="
           rounded-full

@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["fileInput", "currentAvatar", "previewContainer", "previewImage"]
+  static targets = ["fileInput", "currentAvatar", "previewContainer", "previewImage", "removeButton", "removalNotice"]
 
   connect() {
     // Initialize the controller
@@ -42,13 +42,18 @@ export default class extends Controller {
     if (confirm("Are you sure you want to remove your profile picture?")) {
       this.clearFileInput()
       this.hidePreview()
-      
-      // Create a hidden input to signal removal
-      const removeInput = document.createElement('input')
-      removeInput.type = 'hidden'
-      removeInput.name = 'person[personable_attributes][remove_profile_picture]'
-      removeInput.value = '1'
-      this.element.appendChild(removeInput)
+
+      if (!this.element.querySelector("input[name='person[personable_attributes][remove_profile_picture]']")) {
+        const removeInput = document.createElement('input')
+        removeInput.type = 'hidden'
+        removeInput.name = 'person[personable_attributes][remove_profile_picture]'
+        removeInput.value = '1'
+        this.element.appendChild(removeInput)
+      }
+
+      this.currentAvatarTarget.classList.add("opacity-30")
+      this.removeButtonTarget.classList.add("hidden")
+      this.removalNoticeTarget.classList.remove("hidden")
     }
   }
 

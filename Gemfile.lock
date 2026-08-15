@@ -145,7 +145,7 @@ GEM
       faraday-net_http (>= 2.0, < 3.5)
       json
       logger
-    faraday-multipart (1.1.1)
+    faraday-multipart (1.2.0)
       multipart-post (~> 2.0)
     faraday-net_http (3.4.1)
       net-http (>= 0.5.0)
@@ -215,11 +215,12 @@ GEM
       net-imap
       net-pop
       net-smtp
-    marcel (1.1.0)
+    marcel (1.2.1)
     matrix (0.4.3)
     mini_magick (4.13.2)
     mini_mime (1.1.5)
-    minitest (5.26.0)
+    mini_portile2 (2.8.9)
+    minitest (5.27.0)
     minitest-retry (0.2.5)
       minitest (>= 5.0)
     minitest-skip (0.0.3)
@@ -245,6 +246,9 @@ GEM
     net-smtp (0.5.1)
       net-protocol
     nio4r (2.7.4)
+    nokogiri (1.18.10)
+      mini_portile2 (~> 2.8.2)
+      racc (~> 1.4)
     nokogiri (1.18.10-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.18.10-aarch64-linux-musl)
@@ -297,6 +301,7 @@ GEM
       hashery (~> 2.0)
       ruby-rc4
       ttfunk
+    pg (1.6.2)
     pg (1.6.2-aarch64-linux)
     pg (1.6.2-aarch64-linux-musl)
     pg (1.6.2-arm64-darwin)
@@ -373,6 +378,9 @@ GEM
       zeitwerk (~> 2.6)
     rainbow (3.1.1)
     rake (13.3.0)
+    rake-compiler-dock (1.12.0)
+    rb_sys (0.9.128)
+      rake-compiler-dock (= 1.12.0)
     rdoc (6.15.0)
       erb
       psych (>= 4.0.0)
@@ -477,6 +485,8 @@ GEM
       railties (>= 6.0.0)
     stringio (3.1.7)
     sync (0.5.0)
+    syslog (0.4.0)
+      logger
     tailwindcss-rails (2.7.9-aarch64-linux)
       railties (>= 7.0.0)
     tailwindcss-rails (2.7.9-arm64-darwin)
@@ -486,6 +496,8 @@ GEM
     tailwindcss-rails (2.7.9-x86_64-linux)
       railties (>= 7.0.0)
     thor (1.3.2)
+    tiktoken_ruby (0.0.12)
+      rb_sys (~> 0.9)
     tiktoken_ruby (0.0.12-aarch64-linux)
     tiktoken_ruby (0.0.12-arm64-darwin)
     tiktoken_ruby (0.0.12-x86_64-darwin)
@@ -509,7 +521,7 @@ GEM
       concurrent-ruby (~> 1.0)
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
-    unicode-emoji (4.1.0)
+    unicode-emoji (4.2.0)
     uri (1.0.4)
     useragent (0.16.11)
     version_gem (1.1.9)
@@ -585,6 +597,7 @@ DEPENDENCIES
   sprockets-rails
   standard
   stimulus-rails (~> 1.3.3)
+  syslog
   tailwindcss-rails (~> 2.7.2)
   tiktoken_ruby (~> 0.0.9)
   timecop
@@ -594,7 +607,7 @@ DEPENDENCIES
   webmock
 
 RUBY VERSION
-   ruby 3.4.7p58
+   ruby 4.0.2p0
 
 BUNDLED WITH
    2.6.8

@@ -60,12 +60,15 @@
                 <%= button_tag "Remove",
                     type: "button",
                     class: "inline-block font-medium bg-red-100 dark:bg-red-900 dark:text-white border border-red-400 rounded-lg py-2 px-4 cursor-pointer text-sm",
-                    data: { action: "profile-picture-upload#removeImage" } %>
+                    data: { action: "profile-picture-upload#removeImage", profile_picture_upload_target: "removeButton" } %>
               <% end %>
             </div>
 
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
               JPEG, PNG, GIF, or WebP. Max 5MB.
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 hidden" data-profile-picture-upload-target="removalNotice">
+              Photo will be removed when you save.
             </p>
           </div>
         </div>

@@ -15,8 +15,12 @@ class AIBackend::RubyLLM < AIBackend
     ::RubyLLM::OverloadedError, ::RubyLLM::ServiceUnavailableError,
   ].freeze
 
-  def self.supports_driver?(driver)
-    ["openai", "anthropic", "gemini"].include?(driver)
+  # RubyLLM serves every chat provider identity: OpenAI, Anthropic, and Gemini
+  # natively; Groq and OpenRouter over the openai-compatible path (the driver
+  # is :openai with openai_api_base pointed at the service URL). Accepts
+  # symbols or strings; callers pass both.
+  def self.supports_identity?(identity)
+    identity.present? && APIService.chat_provider_identities.include?(identity.to_sym)
   end
 
   def self.client
@@ -25,6 +29,17 @@ class AIBackend::RubyLLM < AIBackend
 
   def self.gem_class
     Rails.env.test? ? ::TestClient::RubyLLM::Chat : ::AIBackend::RubyLLM::InterceptedChat
+  end
+
+  # One stanza per provider credential: the key plus, for openai-compatible
+  # vendors (anything not the canonical OpenAI URL), the base URL override and
+  # the traditional system role those servers expect.
+  def self.configure_context(context, provider:, url:, token:)
+    context.public_send("#{provider}_api_key=", token)
+    if provider == :openai && url != APIService::URL_OPEN_AI
+      context.openai_api_base = url
+      context.openai_use_system_role = true
+    end
   end
 
   def self.provider_for_url(url)
@@ -46,10 +61,7 @@ class AIBackend::RubyLLM < AIBackend
     else
       Rails.logger.info "Connecting to AI API server at #{url} with access token of length #{token.to_s.length}"
       Rails.logger.info "Testing using model #{api_name} for provider #{provider}"
-      context = RubyLLM.context { |c| c.public_send("#{provider}_api_key=", token) }
-      if provider == :openai && url != APIService::URL_OPEN_AI
-        context.openai_api_base = url
-      end
+      context = RubyLLM.context { |c| configure_context(c, provider: provider, url: url, token: token) }
       chat = RubyLLM::Chat.new(model: api_name, provider: provider, assume_model_exists: true, context: context)
       chat.add_message({ role: "user", content: "Hello!" })
       chat.complete.content
@@ -113,16 +125,13 @@ class AIBackend::RubyLLM < AIBackend
   end
 
   def build_chat
-    self.class.gem_class.new(model: @api_name, provider: provider_slug, assume_model_exists: true, context: ruby_llm_context)
+    chat = self.class.gem_class.new(model: @api_name, provider: provider_slug, assume_model_exists: true, context: ruby_llm_context)
+    chat.with_headers(**AIBackend::OpenRouter.attribution_headers) if @api_service.provider_identity == :openrouter
+    chat
   end
 
   def ruby_llm_context
-    self.class.client.context do |c|
-      c.public_send("#{provider_slug}_api_key=", @token)
-      if provider_slug == :openai && @api_service.url != APIService::URL_OPEN_AI
-        c.openai_api_base = @api_service.url
-      end
-    end
+    self.class.client.context { |c| self.class.configure_context(c, provider: provider_slug, url: @api_service.url, token: @token) }
   end
 
   def stream_handler
@@ -197,7 +206,9 @@ class AIBackend::RubyLLM < AIBackend
 
   # Reconstructs the stored OpenAI-shaped content_tool_calls (serialized via
   # JsonSerializer) into RubyLLM::ToolCall objects keyed by id — the shape
-  # RubyLLM expects on a replayed assistant message.
+  # RubyLLM expects on a replayed assistant message. The thought signature
+  # travels with the call because Gemini 3 rejects a functionCall replayed
+  # without the signature it issued.
   def tool_calls_hash(message)
     message.content_tool_calls.each_with_object({}) do |tc, hash|
       id = tc[:id] || tc["id"]
@@ -205,7 +216,12 @@ class AIBackend::RubyLLM < AIBackend
       args = tc.dig(:function, :arguments) || tc.dig("function", "arguments") || "{}"
       args = JSON.parse(args) if args.is_a?(String)
 
-      hash[id] = ::RubyLLM::ToolCall.new(id: id, name: name, arguments: args)
+      hash[id] = ::RubyLLM::ToolCall.new(
+        id: id,
+        name: name,
+        arguments: args,
+        thought_signature: tc[:thought_signature] || tc["thought_signature"],
+      )
     end
   end
 
@@ -237,7 +253,10 @@ class AIBackend::RubyLLM < AIBackend
   end
 
   def tools_enabled?
-    @assistant.language_model.supports_tools? && @api_service.url != APIService::URL_GROQ
+    # The provider's tool policy is a provider fact, not a transport one:
+    # LanguageModel#supports_tools? already consults the identity's backend,
+    # so Groq's pinned denial holds no matter which transport serves the call.
+    @assistant.language_model.supports_tools?
   end
 
   def tool_instances
@@ -253,7 +272,8 @@ class AIBackend::RubyLLM < AIBackend
   def format_tool_calls(tool_calls)
     tool_calls.values.map.with_index do |tc, i|
       { index: i, type: "function", id: tc.id,
-        function: { name: tc.name, arguments: tc.arguments.to_json } }
+        thought_signature: tc.thought_signature,
+        function: { name: tc.name, arguments: tc.arguments.to_json } }.compact
     end
   end
 

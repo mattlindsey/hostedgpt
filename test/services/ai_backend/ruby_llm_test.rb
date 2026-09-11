@@ -7,48 +7,64 @@ class AIBackend::RubyLLMTest < ActiveSupport::TestCase
     @conversation = conversations(:attachments)
     @assistant = assistants(:keith_gpt4)
     @user = @conversation.user
-    @openai_service = api_services(:keith_openai_service)
-    @anthropic_service = api_services(:keith_anthropic_service)
-    @gemini_service = api_services(:keith_gemini_service)
   end
 
-  # Phase 1 — updated for Phase 3 driver support
+  # Provider identity support
 
-  test "supports_driver? returns true for all backends in Phase 3" do
-    assert AIBackend::RubyLLM.supports_driver?("openai")
-    assert AIBackend::RubyLLM.supports_driver?("anthropic")
-    assert AIBackend::RubyLLM.supports_driver?("gemini")
+  test "supports_identity? covers every chat provider identity and nothing else" do
+    assert AIBackend::RubyLLM.supports_identity?(:openai)
+    assert AIBackend::RubyLLM.supports_identity?(:anthropic)
+    assert AIBackend::RubyLLM.supports_identity?(:gemini)
+    assert AIBackend::RubyLLM.supports_identity?(:groq)      # openai-compatible path
+    assert AIBackend::RubyLLM.supports_identity?(:openrouter) # native provider
+    refute AIBackend::RubyLLM.supports_identity?(:brave)
+    refute AIBackend::RubyLLM.supports_identity?(nil)
   end
 
-  test "APIService#ai_backend returns old OpenAI class when feature flag is off" do
+  test "APIService#ai_backend returns the identity's SDK class when the flag is off" do
     stub_features(use_ruby_llm: false) do
-      assert_equal AIBackend::OpenAI, @openai_service.ai_backend
+      assert_equal AIBackend::OpenAI, api_services(:keith_openai_service).ai_backend
+      assert_equal AIBackend::Anthropic, api_services(:keith_anthropic_service).ai_backend
+      assert_equal AIBackend::Gemini, api_services(:keith_gemini_service).ai_backend
+      assert_equal AIBackend::Groq, api_services(:keith_groq_service).ai_backend
+      assert_equal AIBackend::OpenRouter, api_services(:keith_openrouter_service).ai_backend
+      assert_nil api_services(:keith_brave_service).ai_backend
     end
   end
 
-  test "APIService#ai_backend returns old Anthropic class when feature flag is off" do
-    stub_features(use_ruby_llm: false) do
-      assert_equal AIBackend::Anthropic, @anthropic_service.ai_backend
-    end
-  end
-
-  test "APIService#ai_backend returns old Gemini class when feature flag is off" do
-    stub_features(use_ruby_llm: false) do
-      assert_equal AIBackend::Gemini, @gemini_service.ai_backend
-    end
-  end
-
-  test "APIService#ai_backend returns RubyLLM when flag on and driver is openai" do
+  test "APIService#ai_backend returns RubyLLM for every chat identity when the flag is on" do
     stub_features(use_ruby_llm: true) do
-      assert_equal AIBackend::RubyLLM, @openai_service.ai_backend
+      assert_equal AIBackend::RubyLLM, api_services(:keith_openai_service).ai_backend
+      assert_equal AIBackend::RubyLLM, api_services(:keith_anthropic_service).ai_backend
+      assert_equal AIBackend::RubyLLM, api_services(:keith_gemini_service).ai_backend
+      assert_equal AIBackend::RubyLLM, api_services(:keith_groq_service).ai_backend
+      assert_equal AIBackend::RubyLLM, api_services(:keith_openrouter_service).ai_backend
     end
   end
 
-  test "APIService#ai_backend returns RubyLLM for all drivers when flag is on in Phase 3" do
+  test "an explicit sdk choice beats an on site default and an explicit ruby_llm choice beats an off one" do
     stub_features(use_ruby_llm: true) do
-      assert_equal AIBackend::RubyLLM, @openai_service.ai_backend
-      assert_equal AIBackend::RubyLLM, @anthropic_service.ai_backend
-      assert_equal AIBackend::RubyLLM, @gemini_service.ai_backend
+      api_services(:keith_openai_service).user.features[:openai_ai_backend] = "sdk"
+      assert_equal AIBackend::OpenAI, api_services(:keith_openai_service).reload.ai_backend
+    end
+
+    api_services(:keith_openai_service).user.features[:openai_ai_backend] = nil
+    stub_features(use_ruby_llm: false) do
+      api_services(:keith_groq_service).user.features[:groq_ai_backend] = "ruby_llm"
+      assert_equal AIBackend::RubyLLM, api_services(:keith_groq_service).reload.ai_backend
+    end
+  end
+
+  test "an explicit choice is honored per identity, not per driver" do
+    stub_features(use_ruby_llm: true) do
+      user = api_services(:keith_openai_service).user
+      user.features[:openai_ai_backend] = "sdk"
+
+      # openai rides the same driver as groq and openrouter; only the openai
+      # identity's choice should flip it back to the SDK.
+      assert_equal AIBackend::OpenAI, api_services(:keith_openai_service).reload.ai_backend
+      assert_equal AIBackend::RubyLLM, api_services(:keith_groq_service).ai_backend
+      assert_equal AIBackend::RubyLLM, api_services(:keith_openrouter_service).ai_backend
     end
   end
 
@@ -293,12 +309,22 @@ class AIBackend::RubyLLMTest < ActiveSupport::TestCase
     assert_instance_of AIBackend::RubyLLM, backend
   end
 
-  test "ruby_llm_context sets openai_api_base for Groq" do
+  test "ruby_llm_context sets openai_api_base and the system role for Groq" do
     @assistant.language_model.api_service.update!(url: APIService::URL_GROQ, driver: "openai")
     backend = AIBackend::RubyLLM.new(@user, @assistant)
 
     context = backend.send(:ruby_llm_context)
     assert_equal APIService::URL_GROQ, context.openai_api_base
+    assert_equal true, context.openai_use_system_role # compat vendors expect system, not OpenAI's developer role
+  end
+
+  test "ruby_llm_context sets openai_api_base and the system role for OpenRouter" do
+    @assistant.language_model.api_service.update!(url: APIService::URL_OPENROUTER, driver: "openai")
+    backend = AIBackend::RubyLLM.new(@user, @assistant)
+
+    context = backend.send(:ruby_llm_context)
+    assert_equal APIService::URL_OPENROUTER, context.openai_api_base
+    assert_equal true, context.openai_use_system_role
   end
 
   test "ruby_llm_context does not set openai_api_base for canonical OpenAI URL" do
@@ -307,6 +333,19 @@ class AIBackend::RubyLLMTest < ActiveSupport::TestCase
 
     context = backend.send(:ruby_llm_context)
     assert_nil context.openai_api_base
+    assert_nil context.openai_use_system_role
+  end
+
+  test "build_chat sends OpenRouter attribution headers only for the OpenRouter identity" do
+    @assistant.language_model.api_service.update!(url: APIService::URL_OPENROUTER, driver: "openai")
+    backend = AIBackend::RubyLLM.new(@user, @assistant)
+
+    chat = backend.send(:build_chat)
+    assert_equal({ "HTTP-Referer" => Rails.application.config.x.app_url.to_s, "X-Title" => Setting.product_name.to_s }, chat.headers)
+
+    @assistant.language_model.api_service.update!(url: APIService::URL_OPEN_AI)
+    chat = backend.send(:build_chat)
+    assert_empty chat.headers
   end
 
   # Phase 3 — Anthropic + Gemini/Groq text chat
@@ -750,6 +789,72 @@ class AIBackend::RubyLLMTest < ActiveSupport::TestCase
         assert_operator result.map { |tc| tc[:id] }.uniq.length, :>, 1
       end
     end
+  end
+
+  # Gemini 3 rejects a functionCall replayed without the thought signature it
+  # issued, so the signature has to survive the round trip through the database.
+
+  test "stream_next_conversation_message keeps the thought signature on a tool call" do
+    @assistant.language_model.update!(supports_tools: true)
+    message = @conversation.messages.create!(
+      role: :assistant,
+      content_text: nil,
+      assistant: @assistant,
+      index: @conversation.messages.maximum(:index).to_i + 1,
+      version: :latest
+    )
+
+    backend = AIBackend::RubyLLM.new(@user, @assistant, @conversation, message)
+    TestClient::RubyLLM::Chat.stub :function, "helloworld_hi" do
+      TestClient::RubyLLM::Chat.stub :thought_signature, "sig-abc" do
+        result = backend.stream_next_conversation_message { |c| }
+        assert_equal "sig-abc", result[0][:thought_signature]
+      end
+    end
+  end
+
+  test "stream_next_conversation_message omits the thought signature when the provider issues none" do
+    @assistant.language_model.update!(supports_tools: true)
+    message = @conversation.messages.create!(
+      role: :assistant,
+      content_text: nil,
+      assistant: @assistant,
+      index: @conversation.messages.maximum(:index).to_i + 1,
+      version: :latest
+    )
+
+    backend = AIBackend::RubyLLM.new(@user, @assistant, @conversation, message)
+    TestClient::RubyLLM::Chat.stub :function, "helloworld_hi" do
+      result = backend.stream_next_conversation_message { |c| }
+      refute_includes result[0].keys, :thought_signature
+    end
+  end
+
+  test "preceding_conversation_messages replays the stored thought signature" do
+    @assistant.language_model.update!(supports_tools: true)
+    conversation = @conversation
+
+    conversation.messages.create!(
+      role: :assistant,
+      content_text: nil,
+      assistant: @assistant,
+      content_tool_calls: [
+        { type: "function", id: "call_123", thought_signature: "sig-abc",
+          function: { name: "helloworld_hi", arguments: '{"name":"Keith"}' } },
+      ]
+    )
+    follow_up = conversation.messages.create!(
+      role: :assistant,
+      content_text: nil,
+      assistant: @assistant,
+      version: :latest
+    )
+
+    backend = AIBackend::RubyLLM.new(@user, @assistant, conversation, follow_up)
+    msgs = backend.send(:preceding_conversation_messages)
+
+    assistant_replay = msgs.find { |m| m[:role] == :assistant && m[:tool_calls].present? }
+    assert_equal "sig-abc", assistant_replay[:tool_calls]["call_123"].thought_signature
   end
 
   test "preceding_conversation_messages replays tool calls and tool results" do

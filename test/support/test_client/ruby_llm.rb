@@ -1,13 +1,18 @@
 module TestClient
   class RubyLLM
     class Chat
-      attr_reader :messages
+      attr_reader :messages, :headers
 
       def initialize(model:, provider: nil, assume_model_exists: nil, context: nil)
         @@model = model
-        @context = context
+        @headers = {}
         @messages = []
         @last_response = nil
+      end
+
+      def with_headers(**headers)
+        @headers = headers
+        self
       end
 
       def with_instructions(instructions)
@@ -63,7 +68,8 @@ module TestClient
           ::RubyLLM::ToolCall.new(
             id: i.zero? ? self.class.id : "#{self.class.id}_#{i}",
             name: self.class.function,
-            arguments: JSON.parse(self.class.arguments)
+            arguments: JSON.parse(self.class.arguments),
+            thought_signature: self.class.thought_signature
           )
         end
         @messages << OpenStruct.new(role: :assistant, content: nil, tool_calls: tool_calls.to_h { |tc| [tc.id, tc] })
@@ -110,6 +116,12 @@ module TestClient
         1
       end
 
+      # Gemini attaches a thought signature to each tool call; other providers
+      # issue none. Stub this to simulate Gemini.
+      def self.thought_signature
+        nil
+      end
+
       def self.default_text
         "Hello this is model #{@@model}! How can I assist you today?"
       end
@@ -141,7 +153,8 @@ module TestClient
 
     class ContextDouble
       attr_accessor :openai_api_key, :anthropic_api_key, :gemini_api_key,
-        :openai_api_base, :anthropic_api_base, :gemini_api_base
+        :openai_api_base, :anthropic_api_base, :gemini_api_base,
+        :openai_use_system_role
     end
 
     def self.context(&block)
